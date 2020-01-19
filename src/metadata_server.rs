@@ -36,8 +36,6 @@ impl MetaDataServerFlow {
         ]
             .concat();
 
-        let https = HttpsConnector::new();
-        let client = hyper::Client::builder().build::<_, hyper::Body>(https);
         let req = Request::builder()
             .method(Method::GET)
             .uri(url)
