@@ -80,6 +80,7 @@ mod refresh;
 mod service_account;
 mod storage;
 mod types;
+mod metadata_server;
 
 #[doc(inline)]
 pub use crate::authenticator::{

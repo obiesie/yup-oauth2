@@ -1,4 +1,4 @@
-//! Module contianing the core functionality for OAuth2 Authentication.
+//! Module containing the core functionality for OAuth2 Authentication.
 use crate::authenticator_delegate::{DeviceFlowDelegate, InstalledFlowDelegate};
 use crate::device::DeviceFlow;
 use crate::error::Error;
@@ -25,8 +25,8 @@ pub struct Authenticator<C> {
 
 struct DisplayScopes<'a, T>(&'a [T]);
 impl<'a, T> fmt::Display for DisplayScopes<'a, T>
-where
-    T: AsRef<str>,
+    where
+        T: AsRef<str>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str("[")?;
@@ -43,13 +43,13 @@ where
 }
 
 impl<C> Authenticator<C>
-where
-    C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
+    where
+        C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
 {
     /// Return the current token for the provided scopes.
     pub async fn token<'a, T>(&'a self, scopes: &'a [T]) -> Result<AccessToken, Error>
-    where
-        T: AsRef<str>,
+        where
+            T: AsRef<str>,
     {
         log::debug!(
             "access token requested for scopes: {}",
@@ -64,9 +64,9 @@ where
             }
             (
                 Some(TokenInfo {
-                    refresh_token: Some(refresh_token),
-                    ..
-                }),
+                         refresh_token: Some(refresh_token),
+                         ..
+                     }),
                 Some(app_secret),
             ) => {
                 // token is expired but has a refresh token.
@@ -183,8 +183,8 @@ impl<C, F> AuthenticatorBuilder<C, F> {
         storage_type: StorageType,
         auth_flow: AuthFlow,
     ) -> io::Result<Authenticator<C::Connector>>
-    where
-        C: HyperClientBuilder,
+        where
+            C: HyperClientBuilder,
     {
         let hyper_client = hyper_client_builder.build_hyper_client();
         let storage = match storage_type {
@@ -280,15 +280,15 @@ impl<C> AuthenticatorBuilder<C, DeviceFlow> {
 
     /// Create the authenticator.
     pub async fn build(self) -> io::Result<Authenticator<C::Connector>>
-    where
-        C: HyperClientBuilder,
+        where
+            C: HyperClientBuilder,
     {
         Self::common_build(
             self.hyper_client_builder,
             self.storage_type,
             AuthFlow::DeviceFlow(self.auth_flow),
         )
-        .await
+            .await
     }
 }
 
@@ -322,15 +322,15 @@ impl<C> AuthenticatorBuilder<C, InstalledFlow> {
 
     /// Create the authenticator.
     pub async fn build(self) -> io::Result<Authenticator<C::Connector>>
-    where
-        C: HyperClientBuilder,
+        where
+            C: HyperClientBuilder,
     {
         Self::common_build(
             self.hyper_client_builder,
             self.storage_type,
             AuthFlow::InstalledFlow(self.auth_flow),
         )
-        .await
+            .await
     }
 }
 
@@ -361,8 +361,8 @@ impl<C> AuthenticatorBuilder<C, ServiceAccountFlowOpts> {
 
     /// Create the authenticator.
     pub async fn build(self) -> io::Result<Authenticator<C::Connector>>
-    where
-        C: HyperClientBuilder,
+        where
+            C: HyperClientBuilder,
     {
         let service_account_auth_flow = ServiceAccountFlow::new(self.auth_flow)?;
         Self::common_build(
@@ -370,7 +370,7 @@ impl<C> AuthenticatorBuilder<C, ServiceAccountFlowOpts> {
             self.storage_type,
             AuthFlow::ServiceAccountFlow(service_account_auth_flow),
         )
-        .await
+            .await
     }
 }
 
@@ -385,6 +385,7 @@ mod private {
         DeviceFlow(DeviceFlow),
         InstalledFlow(InstalledFlow),
         ServiceAccountFlow(ServiceAccountFlow),
+        MetaDataServerFlow(MetaDataServerFlow),
     }
 
     impl AuthFlow {
@@ -393,6 +394,7 @@ mod private {
                 AuthFlow::DeviceFlow(device_flow) => Some(&device_flow.app_secret),
                 AuthFlow::InstalledFlow(installed_flow) => Some(&installed_flow.app_secret),
                 AuthFlow::ServiceAccountFlow(_) => None,
+                AuthFlow::MetaDataServerFlow(_) => None,
             }
         }
 
@@ -401,9 +403,9 @@ mod private {
             hyper_client: &'a hyper::Client<C>,
             scopes: &'a [T],
         ) -> Result<TokenInfo, Error>
-        where
-            T: AsRef<str>,
-            C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
+            where
+                T: AsRef<str>,
+                C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
         {
             match self {
                 AuthFlow::DeviceFlow(device_flow) => device_flow.token(hyper_client, scopes).await,
@@ -412,6 +414,9 @@ mod private {
                 }
                 AuthFlow::ServiceAccountFlow(service_account_flow) => {
                     service_account_flow.token(hyper_client, scopes).await
+                }
+                AuthFlow::MetaDataServerFlow(metadata_server_flow) => {
+                    metadata_server_flow.token(hyper_client, scopes).await
                 }
             }
         }
@@ -440,8 +445,8 @@ impl HyperClientBuilder for DefaultHyperClient {
 }
 
 impl<C> HyperClientBuilder for hyper::Client<C>
-where
-    C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
+    where
+        C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
 {
     type Connector = C;
 
