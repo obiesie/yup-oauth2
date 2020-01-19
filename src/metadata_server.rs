@@ -4,6 +4,7 @@ use crate::error::Error;
 
 use http::Method;
 use hyper::header::{HeaderValue, HeaderName};
+use hyper::{Request};
 
 pub struct MetaDataServerFlow {}
 

@@ -165,6 +165,7 @@ impl ServiceAccountAuthenticator {
     }
 }
 
+/// Create an authenticator that makes use of google metadata server when running on gcp
 pub struct MetaDataServerAuthenticator;
 impl MetaDataServerAuthenticator {
     /// Use the builder pattern to create an Authenticator that uses the google metadata server.
@@ -380,6 +381,24 @@ impl<C> AuthenticatorBuilder<C, ServiceAccountFlowOpts> {
             AuthFlow::ServiceAccountFlow(service_account_auth_flow),
         )
             .await
+    }
+}
+
+
+/// ## Methods available when building a gcp metadata server authenticator.
+impl<C> AuthenticatorBuilder<C, MetaDataServerFlow> {
+
+    /// Create the authenticator.
+    pub async fn build(self) -> io::Result<Authenticator<C::Connector>>
+        where
+            C: HyperClientBuilder,
+    {
+        let metadata_server_auth_flow = MetaDataServerFlow::new();
+        Self::common_build(
+            self.hyper_client_builder,
+            self.storage_type,
+            AuthFlow::MetaDataServerFlow(metadata_server_auth_flow),
+        ).await
     }
 }
 
