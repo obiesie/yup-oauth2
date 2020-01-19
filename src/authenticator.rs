@@ -14,6 +14,7 @@ use std::fmt;
 use std::io;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use crate::metadata_server::MetaDataServerFlow;
 
 /// Authenticator is responsible for fetching tokens, handling refreshing tokens,
 /// and optionally persisting tokens to disk.
@@ -161,6 +162,14 @@ impl ServiceAccountAuthenticator {
             key: service_account_key,
             subject: None,
         })
+    }
+}
+
+pub struct MetaDataServerAuthenticator;
+impl MetaDataServerAuthenticator {
+    /// Use the builder pattern to create an Authenticator that uses the google metadata server.
+    pub fn builder() -> AuthenticatorBuilder<DefaultHyperClient, MetaDataServerFlow> {
+        AuthenticatorBuilder::<DefaultHyperClient, _>::with_auth_flow(MetaDataServerFlow::new())
     }
 }
 
@@ -380,6 +389,7 @@ mod private {
     use crate::installed::InstalledFlow;
     use crate::service_account::ServiceAccountFlow;
     use crate::types::{ApplicationSecret, TokenInfo};
+    use crate::metadata_server::MetaDataServerFlow;
 
     pub enum AuthFlow {
         DeviceFlow(DeviceFlow),

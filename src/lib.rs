@@ -84,7 +84,7 @@ mod metadata_server;
 
 #[doc(inline)]
 pub use crate::authenticator::{
-    DeviceFlowAuthenticator, InstalledFlowAuthenticator, ServiceAccountAuthenticator,
+    DeviceFlowAuthenticator, InstalledFlowAuthenticator, ServiceAccountAuthenticator, MetaDataServerAuthenticator
 };
 
 pub use crate::helper::*;

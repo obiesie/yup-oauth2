@@ -8,8 +8,8 @@ use hyper::header::{HeaderValue, HeaderName};
 pub struct MetaDataServerFlow {}
 
 impl MetaDataServerFlow {
-    pub(crate) fn new() -> Result<Self, io::Error> {
-        Ok(MetaDataServerFlow {})
+    pub(crate) fn new() -> Self {
+        MetaDataServerFlow {}
     }
 
     /// Send a request for a new Bearer token to the OAuth provider.
