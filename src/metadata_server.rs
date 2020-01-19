@@ -23,13 +23,11 @@ impl MetaDataServerFlow {
             C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     {
 
-        info!("Requesting new token for authenticating request to google api.");
         const METADATA_HOST_ENV: &str = "GCE_METADATA_HOST";
         let host = match env::var(METADATA_HOST_ENV) {
             Ok(ref val) if val != "" => val.clone(),
             _ => "169.254.169.254".to_string(),
         };
-        info!("The host address found is {}", host);
         let url = [
             "http://",
             &host,
@@ -56,7 +54,6 @@ impl MetaDataServerFlow {
 
         let (head, body) = hyper_client.request(req).await?.into_parts();
         let body = hyper::body::to_bytes(body).await?;
-        log::debug!("received response; head: {:?}, body: {:?}", head, body);
         TokenInfo::from_json(&body)
     }
 }
