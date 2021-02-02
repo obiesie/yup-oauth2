@@ -92,6 +92,7 @@ struct Claims<'a> {
     aud: &'a str,
     exp: i64,
     iat: i64,
+    #[serde(rename = "sub")]
     subject: Option<&'a str>,
     scope: String,
 }
@@ -224,9 +225,9 @@ mod tests {
             .await
             .unwrap();
         let acc = ServiceAccountFlow::new(ServiceAccountFlowOpts { key, subject: None }).unwrap();
-        let https = HttpsConnector::new();
+        let https = HttpsConnector::with_native_roots();
         let client = hyper::Client::builder()
-            .keep_alive(false)
+            .pool_max_idle_per_host(0)
             .build::<_, hyper::Body>(https);
         println!(
             "{:?}",

@@ -9,11 +9,11 @@ use crate::storage::{self, Storage};
 use crate::types::{AccessToken, ApplicationSecret, TokenInfo};
 use private::AuthFlow;
 
+use futures::lock::Mutex;
 use std::borrow::Cow;
 use std::fmt;
 use std::io;
 use std::path::PathBuf;
-use std::sync::Mutex;
 use crate::metadata_server::MetaDataServerFlow;
 
 /// Authenticator is responsible for fetching tokens, handling refreshing tokens,
@@ -44,21 +44,48 @@ impl<'a, T> fmt::Display for DisplayScopes<'a, T>
 }
 
 impl<C> Authenticator<C>
-    where
-        C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
+where
+    C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
 {
     /// Return the current token for the provided scopes.
     pub async fn token<'a, T>(&'a self, scopes: &'a [T]) -> Result<AccessToken, Error>
-        where
-            T: AsRef<str>,
+    where
+        T: AsRef<str>,
+    {
+        self.find_token(scopes, /* force_refresh = */ false).await
+    }
+
+    /// Return a token for the provided scopes, but don't reuse cached tokens. Instead,
+    /// always fetch a new token from the OAuth server.
+    pub async fn force_refreshed_token<'a, T>(
+        &'a self,
+        scopes: &'a [T],
+    ) -> Result<AccessToken, Error>
+    where
+        T: AsRef<str>,
+    {
+        self.find_token(scopes, /* force_refresh = */ true).await
+    }
+
+    /// Return a cached token or fetch a new one from the server.
+    async fn find_token<'a, T>(
+        &'a self,
+        scopes: &'a [T],
+        force_refresh: bool,
+    ) -> Result<AccessToken, Error>
+    where
+        T: AsRef<str>,
     {
         log::debug!(
             "access token requested for scopes: {}",
             DisplayScopes(scopes)
         );
         let hashed_scopes = storage::ScopeSet::from(scopes);
-        match (self.storage.get(hashed_scopes), self.auth_flow.app_secret()) {
-            (Some(t), _) if !t.is_expired() => {
+        match (
+            self.storage.get(hashed_scopes).await,
+            self.auth_flow.app_secret(),
+        ) {
+            (Some(t), _) if !t.is_expired() && !force_refresh => {
                 // unexpired token found
                 log::debug!("found valid token in cache: {:?}", t);
                 Ok(t.into())
@@ -290,15 +317,15 @@ impl<C> AuthenticatorBuilder<C, DeviceFlow> {
 
     /// Create the authenticator.
     pub async fn build(self) -> io::Result<Authenticator<C::Connector>>
-        where
-            C: HyperClientBuilder,
+    where
+        C: HyperClientBuilder,
     {
         Self::common_build(
             self.hyper_client_builder,
             self.storage_type,
             AuthFlow::DeviceFlow(self.auth_flow),
         )
-            .await
+        .await
     }
 }
 
@@ -461,6 +488,10 @@ pub trait HyperClientBuilder {
     fn build_hyper_client(self) -> hyper::Client<Self::Connector>;
 }
 
+/// Default authenticator type
+pub type DefaultAuthenticator =
+    Authenticator<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
+
 /// The builder value used when the default hyper client should be used.
 pub struct DefaultHyperClient;
 impl HyperClientBuilder for DefaultHyperClient {
@@ -468,8 +499,8 @@ impl HyperClientBuilder for DefaultHyperClient {
 
     fn build_hyper_client(self) -> hyper::Client<Self::Connector> {
         hyper::Client::builder()
-            .keep_alive(false)
-            .build::<_, hyper::Body>(hyper_rustls::HttpsConnector::new())
+            .pool_max_idle_per_host(0)
+            .build::<_, hyper::Body>(hyper_rustls::HttpsConnector::with_native_roots())
     }
 }
 

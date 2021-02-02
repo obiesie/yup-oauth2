@@ -6,14 +6,17 @@ use crate::authenticator_delegate::{DefaultInstalledFlowDelegate, InstalledFlowD
 use crate::error::Error;
 use crate::types::{ApplicationSecret, TokenInfo};
 
+use futures::lock::Mutex;
 use std::convert::AsRef;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use hyper::header;
+use percent_encoding::{percent_encode, AsciiSet, CONTROLS};
 use tokio::sync::oneshot;
 use url::form_urlencoded;
-use url::percent_encoding::{percent_encode, QUERY_ENCODE_SET};
+
+const QUERY_SET: AsciiSet = CONTROLS.add(b' ').add(b'"').add(b'#').add(b'<').add(b'>');
 
 const OOB_REDIRECT_URI: &str = "urn:ietf:wg:oauth:2.0:oob";
 
@@ -33,8 +36,18 @@ where
     let scopes_string = crate::helper::join(scopes, " ");
 
     url.push_str(auth_uri);
+
+    if !url.contains('?') {
+        url.push('?');
+    } else {
+        match url.chars().last() {
+            Some('?') | None => {}
+            Some(_) => url.push('&'),
+        }
+    }
+
     vec![
-        format!("?scope={}", scopes_string),
+        format!("scope={}", scopes_string),
         "&access_type=offline".to_string(),
         format!("&redirect_uri={}", redirect_uri.unwrap_or(OOB_REDIRECT_URI)),
         "&response_type=code".to_string(),
@@ -42,7 +55,7 @@ where
     ]
     .into_iter()
     .fold(url, |mut u, param| {
-        u.push_str(&percent_encode(param.as_ref(), QUERY_ENCODE_SET).to_string());
+        u.push_str(&percent_encode(param.as_ref(), &QUERY_SET).to_string());
         u
     })
 }
@@ -284,8 +297,9 @@ impl InstalledFlowServer {
 }
 
 mod installed_flow_server {
+    use futures::lock::Mutex;
     use hyper::{Body, Request, Response, StatusCode, Uri};
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use tokio::sync::oneshot;
     use url::form_urlencoded;
 
@@ -310,7 +324,7 @@ mod installed_flow_server {
                         .body(hyper::Body::from("Unparseable URL")),
                     Ok(url) => match auth_code_from_url(url) {
                         Some(auth_code) => {
-                            if let Some(sender) = auth_code_tx.lock().unwrap().take() {
+                            if let Some(sender) = auth_code_tx.lock().await.take() {
                                 let _ = sender.send(auth_code);
                             }
                             hyper::Response::builder().status(StatusCode::OK).body(
@@ -359,6 +373,23 @@ mod tests {
              f.apps.googleusercontent.com",
             build_authentication_request_url(
                 "https://accounts.google.com/o/oauth2/auth",
+                "812741506391-h38jh0j4fv0ce1krdkiq0hfvt6n5am\
+                 rf.apps.googleusercontent.com",
+                &["email", "profile"],
+                None
+            )
+        );
+    }
+
+    #[test]
+    fn test_request_url_builder_appends_queries() {
+        assert_eq!(
+            "https://accounts.google.\
+             com/o/oauth2/auth?unknown=testing&scope=email%20profile&access_type=offline&redirect_uri=urn:ietf:wg:oauth:2.0:\
+             oob&response_type=code&client_id=812741506391-h38jh0j4fv0ce1krdkiq0hfvt6n5amr\
+             f.apps.googleusercontent.com",
+            build_authentication_request_url(
+                "https://accounts.google.com/o/oauth2/auth?unknown=testing",
                 "812741506391-h38jh0j4fv0ce1krdkiq0hfvt6n5am\
                  rf.apps.googleusercontent.com",
                 &["email", "profile"],

@@ -10,7 +10,7 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
-use httptest::{mappers::*, responders::json_encoded, Expectation, Server};
+use httptest::{matchers::*, responders::json_encoded, Expectation, Server};
 use hyper::client::connect::HttpConnector;
 use hyper::Uri;
 use hyper_rustls::HttpsConnector;
@@ -59,9 +59,8 @@ async fn test_device_success() {
     let server = Server::run();
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/code"),
-            request::body(url_decoded(contains_entry((
+            request::method_path("POST", "/code"),
+            request::body(url_decoded(contains((
                 "client_id",
                 matches("902216714886")
             )))),
@@ -76,11 +75,10 @@ async fn test_device_success() {
     );
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/token"),
+            request::method_path("POST", "/token"),
             request::body(url_decoded(all_of![
-                contains_entry(("client_secret", "iuMPN6Ne1PD7cos29Tk9rlqH")),
-                contains_entry(("code", "devicecode")),
+                contains(("client_secret", "iuMPN6Ne1PD7cos29Tk9rlqH")),
+                contains(("code", "devicecode")),
             ])),
         ])
         .respond_with(json_encoded(serde_json::json!({
@@ -105,9 +103,8 @@ async fn test_device_no_code() {
     let server = Server::run();
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/code"),
-            request::body(url_decoded(contains_entry((
+            request::method_path("POST", "/code"),
+            request::body(url_decoded(contains((
                 "client_id",
                 matches("902216714886")
             )))),
@@ -129,9 +126,8 @@ async fn test_device_no_token() {
     let server = Server::run();
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/code"),
-            request::body(url_decoded(contains_entry((
+            request::method_path("POST", "/code"),
+            request::body(url_decoded(contains((
                 "client_id",
                 matches("902216714886")
             )))),
@@ -146,11 +142,10 @@ async fn test_device_no_token() {
     );
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/token"),
+            request::method_path("POST", "/token"),
             request::body(url_decoded(all_of![
-                contains_entry(("client_secret", "iuMPN6Ne1PD7cos29Tk9rlqH")),
-                contains_entry(("code", "devicecode")),
+                contains(("client_secret", "iuMPN6Ne1PD7cos29Tk9rlqH")),
+                contains(("code", "devicecode")),
             ])),
         ])
         .respond_with(json_encoded(serde_json::json!({
@@ -220,9 +215,10 @@ async fn create_installed_flow_auth(
         }
     }
 
-    let mut builder = InstalledFlowAuthenticator::builder(app_secret, method).flow_delegate(
-        Box::new(FD(hyper::Client::builder().build(HttpsConnector::new()))),
-    );
+    let mut builder =
+        InstalledFlowAuthenticator::builder(app_secret, method).flow_delegate(Box::new(FD(
+            hyper::Client::builder().build(HttpsConnector::with_native_roots()),
+        )));
 
     builder = if let Some(filename) = filename {
         builder.persist_tokens_to_disk(filename)
@@ -241,11 +237,10 @@ async fn test_installed_interactive_success() {
         create_installed_flow_auth(&server, InstalledFlowReturnMethod::Interactive, None).await;
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/token"),
+            request::method_path("POST", "/token"),
             request::body(url_decoded(all_of![
-                contains_entry(("code", "authorizationcode")),
-                contains_entry(("client_id", matches("9022167.*"))),
+                contains(("code", "authorizationcode")),
+                contains(("client_id", matches("9022167.*"))),
             ]))
         ])
         .respond_with(json_encoded(serde_json::json!({
@@ -271,11 +266,10 @@ async fn test_installed_redirect_success() {
         create_installed_flow_auth(&server, InstalledFlowReturnMethod::HTTPRedirect, None).await;
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/token"),
+            request::method_path("POST", "/token"),
             request::body(url_decoded(all_of![
-                contains_entry(("code", "authorizationcode")),
-                contains_entry(("client_id", matches("9022167.*"))),
+                contains(("code", "authorizationcode")),
+                contains(("client_id", matches("9022167.*"))),
             ]))
         ])
         .respond_with(json_encoded(serde_json::json!({
@@ -301,11 +295,10 @@ async fn test_installed_error() {
         create_installed_flow_auth(&server, InstalledFlowReturnMethod::Interactive, None).await;
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/token"),
+            request::method_path("POST", "/token"),
             request::body(url_decoded(all_of![
-                contains_entry(("code", "authorizationcode")),
-                contains_entry(("client_id", matches("9022167.*"))),
+                contains(("code", "authorizationcode")),
+                contains(("client_id", matches("9022167.*"))),
             ]))
         ])
         .respond_with(
@@ -351,10 +344,8 @@ async fn test_service_account_success() {
     let auth = create_service_account_auth(&server).await;
 
     server.expect(
-        Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/token"),
-        ]).respond_with(json_encoded(serde_json::json!({
+        Expectation::matching(request::method_path("POST", "/token"))
+        .respond_with(json_encoded(serde_json::json!({
             "access_token": "ya29.c.ElouBywiys0LyNaZoLPJcp1Fdi2KjFMxzvYKLXkTdvM-rDfqKlvEq6PiMhGoGHx97t5FAvz3eb_ahdwlBjSStxHtDVQB4ZPRJQ_EOi-iS7PnayahU2S9Jp8S6rk",
             "expires_in": 3600,
             "token_type": "Bearer"
@@ -374,10 +365,11 @@ async fn test_service_account_error() {
     let server = Server::run();
     let auth = create_service_account_auth(&server).await;
     server.expect(
-        Expectation::matching(all_of![request::method("POST"), request::path("/token"),])
-            .respond_with(json_encoded(serde_json::json!({
+        Expectation::matching(request::method_path("POST", "/token")).respond_with(json_encoded(
+            serde_json::json!({
                 "error": "access_denied",
-            }))),
+            }),
+        )),
     );
 
     let result = auth
@@ -397,11 +389,10 @@ async fn test_refresh() {
     // the next token call.
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/token"),
+            request::method_path("POST", "/token"),
             request::body(url_decoded(all_of![
-                contains_entry(("code", "authorizationcode")),
-                contains_entry(("client_id", matches("^9022167"))),
+                contains(("code", "authorizationcode")),
+                contains(("client_id", matches("^9022167"))),
             ]))
         ])
         .respond_with(json_encoded(serde_json::json!({
@@ -419,11 +410,10 @@ async fn test_refresh() {
 
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/token"),
+            request::method_path("POST", "/token"),
             request::body(url_decoded(all_of![
-                contains_entry(("refresh_token", "refreshtoken")),
-                contains_entry(("client_id", matches("^9022167"))),
+                contains(("refresh_token", "refreshtoken")),
+                contains(("client_id", matches("^9022167"))),
             ]))
         ])
         .respond_with(json_encoded(serde_json::json!({
@@ -441,11 +431,10 @@ async fn test_refresh() {
 
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/token"),
+            request::method_path("POST", "/token"),
             request::body(url_decoded(all_of![
-                contains_entry(("refresh_token", "refreshtoken")),
-                contains_entry(("client_id", matches("^9022167"))),
+                contains(("refresh_token", "refreshtoken")),
+                contains(("client_id", matches("^9022167"))),
             ]))
         ])
         .respond_with(json_encoded(serde_json::json!({
@@ -463,11 +452,10 @@ async fn test_refresh() {
 
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/token"),
+            request::method_path("POST", "/token"),
             request::body(url_decoded(all_of![
-                contains_entry(("refresh_token", "refreshtoken")),
-                contains_entry(("client_id", matches("^9022167"))),
+                contains(("refresh_token", "refreshtoken")),
+                contains(("client_id", matches("^9022167"))),
             ]))
         ])
         .respond_with(json_encoded(serde_json::json!({
@@ -496,11 +484,10 @@ async fn test_memory_storage() {
         create_installed_flow_auth(&server, InstalledFlowReturnMethod::Interactive, None).await;
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/token"),
+            request::method_path("POST", "/token"),
             request::body(url_decoded(all_of![
-                contains_entry(("code", "authorizationcode")),
-                contains_entry(("client_id", matches("^9022167"))),
+                contains(("code", "authorizationcode")),
+                contains(("client_id", matches("^9022167"))),
             ]))
         ])
         .respond_with(json_encoded(serde_json::json!({
@@ -530,11 +517,10 @@ async fn test_memory_storage() {
         create_installed_flow_auth(&server, InstalledFlowReturnMethod::Interactive, None).await;
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/token"),
+            request::method_path("POST", "/token"),
             request::body(url_decoded(all_of![
-                contains_entry(("code", "authorizationcode")),
-                contains_entry(("client_id", matches("^9022167"))),
+                contains(("code", "authorizationcode")),
+                contains(("client_id", matches("^9022167"))),
             ]))
         ])
         .respond_with(json_encoded(serde_json::json!({
@@ -559,11 +545,10 @@ async fn test_disk_storage() {
     let storage_path = tempdir.path().join("tokenstorage.json");
     server.expect(
         Expectation::matching(all_of![
-            request::method("POST"),
-            request::path("/token"),
+            request::method_path("POST", "/token"),
             request::body(url_decoded(all_of![
-                contains_entry(("code", "authorizationcode")),
-                contains_entry(("client_id", matches("^9022167"))),
+                contains(("code", "authorizationcode")),
+                contains(("client_id", matches("^9022167"))),
             ])),
         ])
         .respond_with(json_encoded(serde_json::json!({
